@@ -1,15 +1,21 @@
+import codecs
+import chardet
+import sys
 from lxml import etree as ET
+from datetime import date
+import os
 
-#Börja med att ladda ned och packa upp Sitevisions sitemap-fil. Den är packad i formatet .gz.
+input_file_path = sys.argv[1]
 
-# Ladda sitemap-filen
-file_path = r'C:\Temp\Shared\sitemap1.xml'
+# Först kontrollerar vi filens kodning
+with open(input_file_path, 'rb') as f:
+    result = chardet.detect(f.read())  # eller readline om filen är stor
 
-# Skapa en parser med 'recover=True'-parametern för att hantera eventuella syntaxfel
-parser = ET.XMLParser(recover=True)
+# Sedan öppnar vi filen med den upptäckta kodningen
+parser = ET.XMLParser(recover=True, encoding=result['encoding'])
 
-# Använd den skapade parsern när du parsa XML-filen
-tree = ET.parse(file_path, parser)
+with codecs.open(input_file_path, 'r', encoding=result['encoding'], errors='ignore') as f:
+    tree = ET.parse(f, parser)
 
 root = tree.getroot()
 
@@ -20,7 +26,7 @@ url_elements = root.findall('.//ns0:url', ns)
 # Filtrera url-element med endast .html webbsidor (lägg till fler ändelser vid behov)
 webpage_elements = [url for url in url_elements if url.find('ns0:loc', ns).text.endswith('.html')]
 
-print(f"Found {len(webpage_elements)} .html webpages")
+print(f"Hittade {len(webpage_elements)} .html webbsidor")
 
 # Skapa ny sitemap-fil med endast webbsidor
 new_root = ET.Element('urlset', {
@@ -39,10 +45,20 @@ for elem in webpage_elements:
 new_tree = ET.ElementTree(new_root)
 
 if len(new_root):
-    print("New sitemap has content")
+    print("Den nya sitemap har innehåll")
 else:
-    print("New sitemap is empty")
+    print("Den nya sitemap är tom")
+
+# Genererar ett unikt output-filnamn baserat på dagens datum och ser till att det inte finns några dubletter
+today = date.today()
+output_file_path = f"clean_sitemap_{today.isoformat()}.xml"
+counter = 1
+
+while os.path.exists(output_file_path):
+    output_file_path = f"clean_sitemap_{today.isoformat()}_{counter}.xml"
+    counter += 1
 
 # Spara den nya sitemap-filen
-output_file_path = r'C:\Temp\Shared\clean_sitemap.xml'
 new_tree.write(output_file_path, encoding='utf-8', xml_declaration=True, pretty_print=True)
+
+print(f"Sitemap sparad till: {output_file_path}")
